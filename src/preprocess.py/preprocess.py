@@ -1,10 +1,11 @@
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import glob
 from PIL import Image
 import pydicom
 import pytesseract
+from utils import serializeDicomValue
 
 
 #open a DICOM with dcmread
@@ -56,6 +57,9 @@ print(files)
 
 
 print(len(dicomPaths))
+outputDirectory = "dicom_data_json"
+os.makedirs(outputDirectory, exist_ok=True)
+
 for index in range(len(dicomPaths)): #now for each image, we read it as a dicom, extract metadata and burned-in text
     ds = pydicom.dcmread(dicomPaths[index])
     #we convert each to a pixel array, and then to a png for easier transformation
@@ -67,21 +71,28 @@ for index in range(len(dicomPaths)): #now for each image, we read it as a dicom,
     image.save(os.path.join("pngs", "test.png"))
     metadataValues = {}
     #try extracting text
-    if index == 10:
-        print(dicomPaths[index])
-        print(type(ds))
-        print(ds.keys)
-        metadataValues["Image Type"] = ds.get("Image Type")
-        metadataValues["Modality"] = ds.get("Modality")
-        metadataValues["Study Date"] = ds.get("Study Date")
-        metadataValues["Study Description"] = ds.get("Study Description")
-        metadataValues["Body Part Examined"] = ds.get("Body Part Examined")
-        print(metadataValues)
-        #plot it with matplotlib
-        plt.imshow(ds_pixel_array, cmap='gray')
-        plt.title(ds.PatientName)
-        plt.show()
-        image = Image.open("pngs/test.png")
-        text = pytesseract.image_to_string(image)
-        print(dicomPaths[index])
-        print(text)
+    print(dicomPaths[index])
+    metadataValues["Image Type"] = ds.get("ImageType")
+    metadataValues["Modality"] = ds.get("Modality")
+    metadataValues["Study Date"] = ds.get("StudyDate")
+    metadataValues["Study Description"] = ds.get("StudyDescription")
+    metadataValues["Body Part Examined"] = ds.get("BodyPartExamined")
+    # print(metadataValues)
+    #plot it with matplotlib
+    # plt.imshow(ds_pixel_array, cmap='gray')
+    # plt.title(ds.PatientName)
+    # plt.show()
+    image = Image.open("pngs/test.png")
+    text = pytesseract.image_to_string(image)
+    print(text)
+    metadataValues["text"] = text
+    #generate JSON 
+    filename = os.path.splitext(os.path.basename(dicomPaths[index]))[0]
+    jsonPath = os.path.join(outputDirectory, f"{filename}_metadata.json")
+    for key, value in metadataValues.items():
+        metadataValues[key] = serializeDicomValue(value)
+
+    #write to JSON
+    with open(jsonPath, "w") as f:
+        json.dump(metadataValues, f, indent=4)
+    
